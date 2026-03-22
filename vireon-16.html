@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>VIREON</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+:root {
+  --gold:#c8a45a; --gold-dim:rgba(200,164,90,.38); --gold-soft:rgba(200,164,90,.13);
+  --gold-line:rgba(200,164,90,.12); --white:#f0ede7;
+  --ghi:rgba(240,237,231,.70); --gmd:rgba(240,237,231,.42); --glo:rgba(240,237,231,.18);
+  --bg:#040404; --bdr:rgba(255,255,255,.054);
+  --mono:'JetBrains Mono',monospace; --sans:'Syne',sans-serif;
+  /* Terminal — NEVER outside sys overlays */
+  --tg:#86efac; --tg-lo:rgba(134,239,172,.32); --tg-dim:rgba(134,239,172,.16);
+  --tg-bdr:rgba(134,239,172,.11); --tg-surf:rgba(134,239,172,.026);
+  --tg-warn:#fcd34d; --tg-err:#f87171; --tg-hot:#fb923c;
+  --tg-core:#ff6b6b; --tg-void:rgba(255,107,107,.44); --tg-arg:#a78bfa;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--white);font-family:var(--sans);overflow-x:hidden;cursor:none;-webkit-font-smoothing:antialiased}
+
+/* CURSOR */
+#c-dot,#c-ring{position:fixed;top:0;left:0;pointer-events:none}
+#c-dot{width:5px;height:5px;border-radius:50%;z-index:10001;background:var(--gold);box-shadow:0 0 8px rgba(200,164,90,.65);transition:background .3s,box-shadow .3s}
+#c-ring{width:28px;height:28px;border-radius:50%;z-index:10000;border:1px solid var(--gold-dim);transition:width .18s,height .18s,border-color .22s}
+#c-ring.big{width:44px;height:44px;border-color:var(--gold)}
+body.sys #c-dot{background:var(--tg);box-shadow:0 0 8px rgba(134,239,172,.55)}
+body.sys #c-ring{border-color:rgba(134,239,172,.32)}
+body.sys #c-ring.big{border-color:var(--tg)}
+
+/* GRAIN */
+body::before{content:'';position:fixed;inset:0;z-index:9997;pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity:.021;animation:grain .45s steps(1) infinite}
+@keyframes grain{0%,100%{transform:translate(0,0)}20%{transform:translate(-1%,-2%)}40%{transform:translate(2%,-1%)}60%{transform:translate(-2%,2%)}80%{transform:translate(1%,-1%)}}
+
+/* GRID + VIGNETTE */
+.grid-bg{position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:linear-gradient(rgba(200,164,90,.023) 1px,transparent 1px),linear-gradient(90deg,rgba(200,164,90,.023) 1px,transparent 1px);
+  background-size:64px 64px}
+.vignette{position:fixed;inset:0;z-index:1;pointer-events:none;
+  background:radial-gradient(ellipse 90% 70% at 50% 42%,transparent 12%,rgba(4,4,4,.96) 100%)}
+
+/* NAV */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:20px 52px;
+  display:flex;justify-content:space-between;align-items:center;
+  border-bottom:1px solid var(--bdr);background:rgba(4,4,4,.86);backdrop-filter:blur(24px);animation:navIn .7s ease both}
+@keyframes navIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
+.n-logo{font-size:11px;letter-spacing:.54em;color:var(--gold);font-weight:700}
+.n-links{display:flex;gap:36px}
+.n-links a{font-size:10px;letter-spacing:.32em;color:var(--gmd);text-decoration:none;text-transform:uppercase;transition:color .2s;cursor:none}
+.n-links a:hover{color:var(--white)}
+.n-badge{font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:var(--gmd);display:flex;align-items:center;gap:8px}
+.gold-pip{width:6px;height:6px;border-radius:50%;background:var(--gold);box-shadow:0 0 7px var(--gold);animation:pip 2.4s ease infinite}
+@keyframes pip{0%,100%{opacity:1}50%{opacity:.25}}
+
+/* SECTIONS */
+section{position:relative;z-index:3}
+
+/* HERO */
+#hero{min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:118px 24px 80px}
+.h-badge{font-family:var(--mono);font-size:10px;letter-spacing:.46em;color:var(--gold);text-transform:uppercase;border:1px solid var(--gold-line);padding:6px 20px;margin-bottom:48px;animation:up .8s .1s ease both;opacity:0}
+.h-title{font-size:clamp(74px,13.5vw,166px);font-weight:800;letter-spacing:.1em;line-height:.9;color:var(--white);text-shadow:0 0 90px rgba(200,164,90,.09);animation:up .9s .22s ease both,halo 7s 1.5s ease infinite;opacity:0;margin-bottom:30px}
+@keyframes halo{0%,100%{text-shadow:0 0 90px rgba(200,164,90,.09)}50%{text-shadow:0 0 160px rgba(200,164,90,.26),0 0 300px rgba(200,164,90,.07)}}
+.h-sub{font-size:clamp(11px,1.8vw,14px);letter-spacing:.3em;color:var(--ghi);text-transform:uppercase;margin-bottom:34px;animation:up .8s .38s ease both;opacity:0}
+.h-lines{display:flex;flex-direction:column;gap:5px;margin-bottom:58px;animation:up .8s .52s ease both;opacity:0}
+.h-lines span{font-family:var(--mono);font-size:12px;letter-spacing:.24em;color:var(--gmd)}
+.h-btns{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;animation:up .8s .66s ease both;opacity:0}
+@keyframes up{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+
+/* BUTTONS — landing gold/white only */
+.btn{padding:13px 34px;font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:.38em;text-transform:uppercase;border:none;cursor:none;position:relative;overflow:hidden;transition:transform .2s,box-shadow .25s}
+.btn::after{content:'';position:absolute;inset:0;background:rgba(255,255,255,.06);opacity:0;transition:opacity .2s}
+.btn:hover::after{opacity:1}
+.btn:hover{transform:translateY(-2px)}
+.btn-gold{background:var(--gold);color:#040404;box-shadow:0 0 20px rgba(200,164,90,.28)}
+.btn-gold:hover{box-shadow:0 0 44px rgba(200,164,90,.56)}
+.btn-ghost{background:transparent;color:var(--white);border:1px solid rgba(240,237,231,.14)}
+.btn-ghost:hover{border-color:var(--gold-dim);color:var(--gold);box-shadow:0 0 14px var(--gold-soft)}
+
+.rule{width:100%;height:1px;position:relative;z-index:3;background:linear-gradient(90deg,transparent,var(--bdr) 20%,var(--bdr) 80%,transparent)}
+.wrap{max-width:900px;margin:0 auto;padding:96px 44px}
+.s-label{font-family:var(--mono);font-size:10px;letter-spacing:.48em;color:var(--gold);text-transform:uppercase;display:flex;align-items:center;gap:18px;margin-bottom:40px}
+.s-label::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--gold-dim),transparent)}
+.s-title{font-size:clamp(28px,5vw,54px);font-weight:700;letter-spacing:.04em;color:var(--white);margin-bottom:40px}
+
+/* SIGNAL ROWS */
+.sig-row{display:flex;align-items:center;gap:18px;padding:22px 0;border-bottom:1px solid var(--bdr);font-family:var(--mono);font-size:13px;color:var(--ghi);transition:color .25s,padding-left .28s;cursor:none}
+.sig-row:first-child{border-top:1px solid var(--bdr)}
+.sig-row:hover{color:var(--white);padding-left:10px}
+.sig-pip{width:6px;height:6px;border-radius:50%;flex-shrink:0;background:var(--gold);box-shadow:0 0 7px var(--gold);animation:pip 2.6s ease infinite}
+.sig-row:nth-child(2) .sig-pip{animation-delay:.7s}
+.sig-row:nth-child(3) .sig-pip{animation-delay:1.3s}
+
+/* SYSTEM ROWS */
+.sys-row{display:flex;align-items:center;gap:18px;padding:24px 0;border-bottom:1px solid var(--bdr);font-size:clamp(14px,2.4vw,20px);font-weight:500;letter-spacing:.06em;color:var(--ghi);transition:color .25s,padding-left .28s;cursor:none}
+.sys-row:first-child{border-top:1px solid var(--bdr)}
+.sys-row:hover{color:var(--white);padding-left:10px}
+.sys-dash{color:var(--gold);transition:transform .25s}
+.sys-row:hover .sys-dash{transform:translateX(5px)}
+.sys-idx{margin-left:auto;font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--glo)}
+
+/* ACCESS SECTION */
+#access{background:linear-gradient(135deg,rgba(200,164,90,.018) 0%,transparent 55%)}
+.a-body{font-family:var(--mono);font-size:15px;line-height:2.2;color:var(--ghi);margin-bottom:44px}
+.a-body strong{color:var(--white)}
+
+/* LOG BOX — landing gold timestamps, no green */
+.log-shell{background:#020202;margin-top:44px;border:1px solid rgba(200,164,90,.09);position:relative;overflow:hidden}
+.log-shell::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);opacity:.26}
+.log-chrome{display:flex;align-items:center;gap:10px;padding:12px 22px;border-bottom:1px solid rgba(200,164,90,.07);background:rgba(200,164,90,.012)}
+.cdot{width:10px;height:10px;border-radius:50%}
+.cr{background:#ff5f57}.cy{background:#febc2e}.cgr{background:#28c840}
+.log-lbl{margin-left:10px;font-family:var(--mono);font-size:10px;letter-spacing:.3em;color:var(--glo)}
+#log-out{padding:18px 24px;min-height:136px}
+.ll{display:flex;gap:18px;font-family:var(--mono);font-size:12px;line-height:1.95;opacity:0;animation:llIn .3s ease forwards}
+.ll-t{color:rgba(200,164,90,.48);min-width:60px}
+.ll-m{color:var(--ghi)}
+.ll-m b{color:var(--white);font-weight:400}
+@keyframes llIn{from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:none}}
+
+/* FOOTER */
+footer{position:relative;z-index:3;padding:50px 52px;border-top:1px solid var(--bdr);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:20px}
+.ft-i{font-family:var(--mono);font-size:12px;letter-spacing:.16em;color:var(--glo);font-style:italic}
+.ft-logo{font-size:11px;letter-spacing:.52em;color:var(--gold);font-weight:700}
+.ft-copy{font-family:var(--mono);font-size:9px;letter-spacing:.16em;color:rgba(240,237,231,.1)}
+
+/* REVEAL */
+.rv{opacity:0;transform:translateY(22px);transition:opacity .65s ease,transform .65s ease}
+.rv.on{opacity:1;transform:none}
+.d1{transition-delay:.1s}.d2{transition-delay:.2s}.d3{transition-delay:.3s}
+
+/* ═══ CINEMATIC OVERLAY ═══ */
+#ov-cin{position:fixed;inset:0;z-index:1000;background:#000;display:none;flex-direction:column;justify-content:center;align-items:center;font-family:var(--mono);overflow:hidden}
+#ov-cin.open{display:flex}
+#ov-cin::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(134,239,172,.025) 2px,rgba(134,239,172,.025) 4px);pointer-events:none;z-index:1;animation:scanFade 3s ease infinite}
+@keyframes scanFade{0%,100%{opacity:.4}50%{opacity:1}}
+.cin-glitch{position:absolute;inset:0;z-index:2;pointer-events:none;opacity:0}
+.cin-glitch.fire{animation:glFire .35s steps(1) forwards}
+@keyframes glFire{0%{opacity:0}10%{opacity:.7;background:rgba(134,239,172,.08);clip-path:inset(30% 0 50% 0)}20%{opacity:.3;clip-path:inset(60% 0 10% 0)}30%{opacity:.8;background:rgba(134,239,172,.05);clip-path:inset(10% 0 70% 0)}40%{opacity:0}}
+#cin-wrap{position:relative;z-index:3;width:340px}
+#cin-lines{color:var(--tg);font-size:13px;line-height:1.95;margin-bottom:24px}
+.cl{opacity:0;animation:clIn .25s ease forwards}
+@keyframes clIn{from{opacity:0;transform:translateX(-4px)}to{opacity:1;transform:none}}
+.cl.err{color:var(--tg-err)}.cl.warn{color:var(--tg-warn)}.cl.dim{color:var(--tg-lo)}.cl.pct{color:var(--tg-lo)}
+#cin-bar-wrap{width:100%;height:1px;background:rgba(134,239,172,.12);position:relative}
+#cin-bar{height:100%;width:0;background:var(--tg);box-shadow:0 0 8px var(--tg);transition:width .08s linear}
+#cin-pct-lbl{font-size:10px;letter-spacing:.22em;color:var(--tg-lo);margin-top:8px;text-align:right}
+
+/* ═══ RESUME OVERLAY (gold/white) ═══ */
+#ov-resume{position:fixed;inset:0;z-index:900;background:rgba(4,4,4,.98);display:none;flex-direction:column;justify-content:center;align-items:center;backdrop-filter:blur(24px)}
+#ov-resume.open{display:flex}
+.r-card{width:100%;max-width:480px;text-align:center;border:1px solid var(--gold-line);padding:56px 44px;background:rgba(4,4,4,.94);animation:cIn .3s ease both}
+@keyframes cIn{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
+.r-eye{font-family:var(--mono);font-size:10px;letter-spacing:.52em;color:var(--gold);margin-bottom:28px;text-transform:uppercase}
+.r-title{font-size:32px;font-weight:700;letter-spacing:.06em;color:var(--white);margin-bottom:14px}
+.r-meta{font-family:var(--mono);font-size:12px;letter-spacing:.18em;color:var(--gmd);margin-bottom:6px}
+.r-last{font-family:var(--mono);font-size:11px;letter-spacing:.2em;color:var(--gold);margin-bottom:44px}
+.r-btns{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+.btn-cancel{font-family:var(--mono);font-size:10px;letter-spacing:.3em;color:var(--gmd);cursor:none;padding:13px 26px;border:1px solid rgba(255,255,255,.07);background:transparent;transition:color .2s}
+.btn-cancel:hover{color:var(--white)}
+
+/* ═══ ACCESS OVERLAY (gold/white) ═══ */
+#ov-access{position:fixed;inset:0;z-index:800;background:rgba(3,3,3,.97);display:none;flex-direction:column;justify-content:center;align-items:center;backdrop-filter:blur(16px)}
+#ov-access.open{display:flex}
+.acc-card{width:100%;max-width:460px;border:1px solid var(--gold-line);padding:52px 44px;text-align:center;background:rgba(4,4,4,.92);animation:cIn .28s ease both}
+.acc-eye{font-family:var(--mono);font-size:10px;letter-spacing:.52em;color:var(--gold);margin-bottom:28px;text-transform:uppercase}
+.acc-title{font-size:28px;font-weight:700;letter-spacing:.08em;color:var(--white);margin-bottom:10px}
+.acc-desc{font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--gmd);margin-bottom:36px;line-height:1.9}
+#acc-key{width:100%;background:#030303;border:1px solid rgba(240,237,231,.1);padding:14px 22px;margin-bottom:14px;font-family:var(--mono);font-size:15px;letter-spacing:.42em;color:var(--white);text-align:center;text-transform:uppercase;outline:none;transition:border-color .2s}
+#acc-key:focus{border-color:var(--gold-dim)}
+#acc-key::placeholder{color:var(--glo);letter-spacing:.24em;text-transform:none}
+#acc-msg{font-family:var(--mono);font-size:11px;letter-spacing:.18em;min-height:36px;margin-bottom:20px;line-height:1.9;white-space:pre}
+.acc-btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+
+/* ═══ TERMINAL OVERLAY — GREEN ZONE ═══ */
+#ov-term{position:fixed;inset:0;z-index:700;background:#000;display:none;flex-direction:column;font-family:var(--mono)}
+#ov-term.open{display:flex}
+.t-bar{padding:15px 30px;border-bottom:1px solid var(--tg-bdr);display:flex;justify-content:space-between;align-items:center;background:var(--tg-surf)}
+.t-bar-title{font-size:11px;letter-spacing:.44em;color:var(--tg)}
+.t-bar-close{font-size:10px;letter-spacing:.28em;color:rgba(255,255,255,.28);cursor:none;padding:6px 16px;background:transparent;border:1px solid rgba(255,255,255,.07);transition:color .2s,border-color .2s}
+.t-bar-close:hover{color:var(--tg);border-color:var(--tg-bdr)}
+#t-body{flex:1;overflow-y:auto;padding:28px 34px;scrollbar-width:thin;scrollbar-color:rgba(134,239,172,.09) transparent}
+/* Terminal text classes — green palette only */
+.tl{font-size:13px;line-height:1.86;color:rgba(255,255,255,.76);white-space:pre-wrap;word-break:break-all;margin-bottom:1px}
+.tl.g{color:var(--tg)}.tl.dim{color:var(--tg-lo)}.tl.warn{color:var(--tg-warn)}
+.tl.err{color:var(--tg-err)}.tl.hot{color:var(--tg-hot)}.tl.core{color:var(--tg-core)}
+.tl.void{color:var(--tg-void);letter-spacing:.08em}.tl.arg{color:var(--tg-arg)}
+.tl.flkr{color:var(--tg-core);animation:flkr 1.8s ease forwards}
+@keyframes flkr{0%{opacity:1}8%{opacity:0}12%{opacity:1}20%{opacity:.3}22%{opacity:1}55%{opacity:1}60%{opacity:0}63%{opacity:.7}66%{opacity:0}70%{opacity:1}100%{opacity:.6}}
+@keyframes scrFlk{0%{opacity:1}5%{opacity:.6}7%{opacity:1}32%{opacity:.3}34%{opacity:1}62%{opacity:0}65%{opacity:.8}67%{opacity:1}}
+#t-body.flk{animation:scrFlk .9s ease forwards}
+#ov-term.l3::after{content:'';position:absolute;inset:0;pointer-events:none;z-index:10;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(255,107,107,.015) 3px,rgba(255,107,107,.015) 4px);animation:scanP 3s ease infinite}
+@keyframes scanP{0%,100%{opacity:0}50%{opacity:1}}
+.t-prompt-row{display:flex;align-items:center;gap:12px;padding:14px 34px 22px;border-top:1px solid var(--tg-bdr)}
+.t-sym{color:var(--tg);font-size:13px;white-space:nowrap}
+#t-in{flex:1;background:transparent;border:none;outline:none;font-family:var(--mono);font-size:13px;color:rgba(255,255,255,.84);caret-color:var(--tg)}
+#t-in::placeholder{color:var(--tg-dim)}
+
+/* ═══ DASHBOARD — GREEN ZONE ═══ */
+#ov-dash{position:fixed;inset:0;z-index:750;background:#000;display:none;flex-direction:column;font-family:var(--mono)}
+#ov-dash.open{display:flex}
+.d-bar{padding:15px 30px;border-bottom:1px solid var(--tg-bdr);display:flex;justify-content:space-between;align-items:center;background:var(--tg-surf)}
+.d-bar-title{font-size:11px;letter-spacing:.44em;color:var(--tg)}
+.d-bar-close{font-size:10px;letter-spacing:.28em;color:rgba(255,255,255,.28);cursor:none;padding:6px 16px;background:transparent;border:1px solid rgba(255,255,255,.07);transition:color .2s,border-color .2s}
+.d-bar-close:hover{color:var(--tg);border-color:var(--tg-bdr)}
+.d-body{flex:1;overflow-y:auto;padding:52px 44px}
+.d-title{font-family:var(--sans);font-size:clamp(40px,7vw,80px);font-weight:800;letter-spacing:.1em;color:rgba(255,255,255,.92);text-shadow:0 0 70px rgba(134,239,172,.13);margin-bottom:10px}
+.d-sub{font-size:11px;letter-spacing:.42em;color:var(--tg);margin-bottom:56px}
+.d-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:1px;background:var(--tg-bdr);border:1px solid var(--tg-bdr);margin-bottom:50px}
+.d-cell{background:#020202;padding:26px 24px}
+.d-key{font-size:9px;letter-spacing:.44em;color:var(--tg-lo);text-transform:uppercase;margin-bottom:10px}
+.d-val{font-size:14px;letter-spacing:.1em;color:rgba(255,255,255,.82)}
+.d-val.on{color:var(--tg)}
+.d-log-title{font-size:10px;letter-spacing:.4em;color:var(--tg);margin-bottom:18px}
+
+@media(max-width:768px){
+  nav{padding:16px 20px}.n-links{display:none}
+  .wrap{padding:62px 22px}
+  footer{padding:38px 22px;flex-direction:column;align-items:flex-start}
+  #t-body{padding:18px 18px}.t-prompt-row{padding:12px 18px 18px}
+  .d-body{padding:30px 22px}.r-card,.acc-card{padding:36px 22px}
+  #cin-wrap{width:90%}
+}
+</style>
+</head>
+<body>
+
+<div id="c-dot"></div>
+<div id="c-ring"></div>
+<div class="grid-bg"></div>
+<div class="vignette"></div>
+
+<!-- NAV -->
+<nav>
+  <span class="n-logo">VIREON</span>
+  <div class="n-links">
+    <a href="#signals">Signals</a>
+    <a href="#systems">Systems</a>
+    <a href="#access">Access</a>
+    <a href="#logs">Logs</a>
+  </div>
+  <div class="n-badge">
+    <div class="gold-pip"></div>
+    <span id="nav-lbl">SYS:ONLINE</span>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section id="hero">
+  <div class="h-badge">Onchain Infrastructure // Phase 01</div>
+  <h1 class="h-title">VIREON</h1>
+  <p class="h-sub">We build systems that operate onchain.</p>
+  <div class="h-lines">
+    <span>No hype.</span>
+    <span>No noise.</span>
+    <span>Only execution.</span>
+  </div>
+  <div class="h-btns">
+    <button class="btn btn-gold"  id="btn-enter">ENTER</button>
+    <button class="btn btn-ghost" id="btn-req">REQUEST ACCESS</button>
+  </div>
+</section>
+<div class="rule"></div>
+
+<!-- SIGNALS -->
+<section id="signals">
+  <div class="wrap">
+    <div class="s-label rv">Signals</div>
+    <h2 class="s-title rv d1">Signals</h2>
+    <div class="rv d2">
+      <div class="sig-row"><div class="sig-pip"></div>— Unusual activity detected</div>
+      <div class="sig-row"><div class="sig-pip"></div>— New system interaction</div>
+      <div class="sig-row"><div class="sig-pip"></div>— Early participants: limited</div>
+    </div>
+  </div>
+</section>
+<div class="rule"></div>
+
+<!-- SYSTEMS -->
+<section id="systems">
+  <div class="wrap">
+    <div class="s-label rv">Systems</div>
+    <h2 class="s-title rv d1">Active Systems</h2>
+    <div class="rv d2">
+      <div class="sys-row"><span class="sys-dash">—</span> Transaction flows   <span class="sys-idx">01</span></div>
+      <div class="sys-row"><span class="sys-dash">—</span> Coordination layers <span class="sys-idx">02</span></div>
+      <div class="sys-row"><span class="sys-dash">—</span> Execution pipelines <span class="sys-idx">03</span></div>
+    </div>
+  </div>
+</section>
+<div class="rule"></div>
+
+<!-- ACCESS -->
+<section id="access">
+  <div class="wrap">
+    <div class="s-label rv">Access Control</div>
+    <h2 class="s-title rv d1">Access</h2>
+    <div class="a-body rv d2">
+      <p><strong>Access is limited.</strong></p>
+      <p>Vireon is not open to everyone.</p>
+      <p>We work with a small number of operators<br>focused on execution.</p>
+    </div>
+    <div class="rv d3"><button class="btn btn-gold" id="btn-apply">APPLY</button></div>
+  </div>
+</section>
+<div class="rule"></div>
+
+<!-- LIVE LOGS -->
+<section id="logs">
+  <div class="wrap">
+    <div class="s-label rv">Output Stream</div>
+    <h2 class="s-title rv d1">Live Logs</h2>
+    <div class="log-shell rv d2">
+      <div class="log-chrome">
+        <div class="cdot cr"></div><div class="cdot cy"></div><div class="cdot cgr"></div>
+        <span class="log-lbl">vireon // live stream</span>
+      </div>
+      <div id="log-out"></div>
+    </div>
+  </div>
+</section>
+<div class="rule"></div>
+
+<!-- FOOTER -->
+<footer>
+  <span class="ft-i">Built for those who move early.</span>
+  <span class="ft-logo">VIREON</span>
+  <span class="ft-copy">© 2026 VIREON. All rights reserved.</span>
+</footer>
+
+<!-- CINEMATIC OVERLAY -->
+<div id="ov-cin">
+  <div class="cin-glitch" id="cin-glitch"></div>
+  <div id="cin-wrap">
+    <div id="cin-lines"></div>
+    <div id="cin-bar-wrap"><div id="cin-bar"></div></div>
+    <div id="cin-pct-lbl">0%</div>
+  </div>
+</div>
+
+<!-- RESUME OVERLAY (gold/white) -->
+<div id="ov-resume">
+  <div class="r-card">
+    <div class="r-eye">// Session Detected</div>
+    <h2 class="r-title">Welcome back.</h2>
+    <p class="r-meta">An active session was found on this device.</p>
+    <p class="r-last" id="r-last"></p>
+    <div class="r-btns">
+      <button class="btn btn-gold" id="btn-resume">RESUME</button>
+      <button class="btn-cancel"   id="btn-new">NEW SESSION</button>
+    </div>
+  </div>
+</div>
+
+<!-- ACCESS OVERLAY (gold/white) -->
+<div id="ov-access">
+  <div class="acc-card">
+    <div class="acc-eye">// Access Protocol</div>
+    <h2 class="acc-title">REQUEST ACCESS</h2>
+    <p class="acc-desc">Enter your operator key to authenticate.<br>Keys are issued to selected operators only.</p>
+    <input id="acc-key" type="text" placeholder="enter access key" maxlength="24" autocomplete="off" spellcheck="false"/>
+    <div id="acc-msg"></div>
+    <div class="acc-btns">
+      <button class="btn btn-gold" id="acc-submit">AUTHENTICATE</button>
+      <button class="btn-cancel"   id="acc-cancel">CANCEL</button>
+    </div>
+  </div>
+</div>
+
+<!-- TERMINAL OVERLAY (GREEN ZONE) -->
+<div id="ov-term">
+  <div class="t-bar">
+    <span class="t-bar-title">VIREON // TERMINAL</span>
+    <button class="t-bar-close" id="t-close">[ MINIMIZE ]</button>
+  </div>
+  <div id="t-body"></div>
+  <div class="t-prompt-row">
+    <span class="t-sym" id="t-sym">vireon:/&gt;</span>
+    <input id="t-in" type="text" autocomplete="off" spellcheck="false" placeholder="type a command..."/>
+  </div>
+</div>
+
+<!-- DASHBOARD OVERLAY (GREEN ZONE) -->
+<div id="ov-dash">
+  <div class="d-bar">
+    <span class="d-bar-title">VIREON // PANEL</span>
+    <button class="d-bar-close" id="d-close">[ CLOSE ]</button>
+  </div>
+  <div class="d-body">
+    <div class="d-title">VIREON PANEL</div>
+    <div class="d-sub">// INTERNAL SYSTEM VIEW</div>
+    <div class="d-grid">
+      <div class="d-cell"><div class="d-key">Status</div><div class="d-val on">ACTIVE</div></div>
+      <div class="d-cell"><div class="d-key">Role</div><div class="d-val" id="d-role">—</div></div>
+      <div class="d-cell"><div class="d-key">Access</div><div class="d-val on">GRANTED</div></div>
+      <div class="d-cell"><div class="d-key">Phase</div><div class="d-val">01</div></div>
+      <div class="d-cell"><div class="d-key">Network</div><div class="d-val">BASE</div></div>
+      <div class="d-cell"><div class="d-key">Session</div><div class="d-val on" id="d-sess">—</div></div>
+    </div>
+    <div class="d-log-title">// ACTIVITY LOG</div>
+    <div id="d-log"></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* ══ CURSOR ══ */
+const $dot=document.getElementById('c-dot'),$ring=document.getElementById('c-ring');
+let mx=0,my=0,rx=0,ry=0;
+document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY});
+document.querySelectorAll('button,a,.sys-row,.sig-row').forEach(el=>{
+  el.addEventListener('mouseenter',()=>$ring.classList.add('big'));
+  el.addEventListener('mouseleave',()=>$ring.classList.remove('big'));
+});
+(function loop(){
+  $dot.style.transform=`translate(${mx-2.5}px,${my-2.5}px)`;
+  rx+=(mx-rx)*.11;ry+=(my-ry)*.11;
+  $ring.style.transform=`translate(${rx-14}px,${ry-14}px)`;
+  requestAnimationFrame(loop);
+})();
+
+/* ══ SCROLL REVEAL ══ */
+const ro=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)e.target.classList.add('on')}),{threshold:.1});
+document.querySelectorAll('.rv').forEach(el=>ro.observe(el));
+
+/* ══ LANDING LIVE LOGS — gold/white only ══ */
+const LPOOL=[
+  {t:'12:04',m:'system <b>initialized</b>'},{t:'12:18',m:'execution layer <b>deployed</b>'},
+  {t:'12:32',m:'transaction <b>confirmed</b>'},{t:'12:47',m:'new flow <b>detected</b>'},
+  {t:'13:01',m:'<b>new operator</b> detected'},{t:'13:15',m:'signal strength <b>increased</b>'},
+  {t:'13:29',m:'block finalized — <b>0x4f2a...8c1d</b>'},{t:'13:43',m:'pipeline <b>active</b>'},
+  {t:'13:57',m:'coordination layer <b>synced</b>'},{t:'14:11',m:'anomaly scan — <b>clear</b>'},
+  {t:'14:25',m:'<b>new operator</b> session started'},{t:'14:39',m:'execution confirmed — <b>flow_07</b>'},
+];
+const $lo=document.getElementById('log-out');let lIdx=0;
+function pushLL(e){
+  const d=document.createElement('div');d.className='ll';
+  d.innerHTML=`<span class="ll-t">[${e.t}]</span><span class="ll-m">${e.m}</span>`;
+  $lo.appendChild(d);const a=$lo.querySelectorAll('.ll');if(a.length>5)a[0].remove();
+}
+LPOOL.slice(0,4).forEach((l,i)=>setTimeout(()=>pushLL(l),i*360));lIdx=4;
+setTimeout(function cycle(){pushLL(LPOOL[lIdx%LPOOL.length]);lIdx++;setTimeout(cycle,2000+Math.random()*700);},4*360+1600);
+
+/* ══ STORAGE ══ */
+const LSK=['v_access','v_role','v_last','v_h1','v_h2','v_h3','v_signal','v_argref'];
+const LS={get:k=>localStorage.getItem(k),set:(k,v)=>localStorage.setItem(k,v),clear:()=>LSK.forEach(k=>localStorage.removeItem(k))};
+const getAccess=()=>LS.get('v_access');
+const getRole=()=>LS.get('v_role');
+const has=k=>LS.get(k)==='1';
+const set1=k=>LS.set(k,'1');
+function grantAuth(role){LS.set('v_access','granted');LS.set('v_role',role);LS.set('v_last',Date.now().toString())}
+function minutesAgo(ts){
+  if(!ts)return null;const d=Math.floor((Date.now()-parseInt(ts))/60000);
+  if(d<1)return 'just now';return d===1?'1 min ago':`${d} min ago`;
+}
+
+/* ══ FILESYSTEM ══ */
+const FS={
+  '/':['logs.txt','readme.txt','core'],
+  '/core':['node.log','signal.dat','.access']
+};
+const FC={
+  '/logs.txt':'[12:01] system active\n[12:03] node connected\n[12:05] execution confirmed\n[12:08] pipeline running',
+  '/readme.txt':'VIREON SYSTEM v0.1\n---\nThis system is not public.\nAccess is restricted.\nIf you are reading this, you were meant to.',
+  '/core/node.log':'node_01: active   uptime: 99.97%\nnode_02: active   uptime: 99.94%\nnode_03: syncing  block:  14,827,438',
+  '/core/signal.dat':'signal_ref: VX-01\nclassification: undefined\norigin: unknown',
+  '/core/.access':'VireonAccess'
+};
+let cwd='/';
+function fsLs(showHidden){const e=FS[cwd]||[];return showHidden?e:e.filter(x=>!x.startsWith('.'))}
+function fsCd(t){
+  if(t==='..'||t==='..'){cwd=cwd==='/'?'/':cwd.split('/').slice(0,-1).join('/')||'/';return null}
+  const p=cwd==='/'?`/${t}`:`${cwd}/${t}`;
+  if(FS[p]!==undefined){cwd=p;return null}
+  return `cd: ${t}: no such directory`
+}
+function fsOpen(n){
+  const p=cwd==='/'?`/${n}`:`${cwd}/${n}`;
+  if(FC[p]!==undefined)return{content:FC[p],isAccess:n==='.access'};
+  if(FS[p]!==undefined)return{content:`${n}: is a directory`,isAccess:false};
+  return{content:`open: ${n}: file not found`,isAccess:false}
+}
+function updatePrompt(){document.getElementById('t-sym').textContent=`vireon:${cwd}>`}
+
+/* ══ CINEMATIC ══ */
+const $ovCin=document.getElementById('ov-cin');
+const $cinLines=document.getElementById('cin-lines');
+const $cinBar=document.getElementById('cin-bar');
+const $cinPct=document.getElementById('cin-pct-lbl');
+const $glitch=document.getElementById('cin-glitch');
+
+function cinLine(txt,cls='',delay){
+  return new Promise(res=>setTimeout(()=>{
+    const d=document.createElement('div');d.className='cl '+(cls||'');d.textContent=txt;
+    $cinLines.appendChild(d);res();
+  },delay));
+}
+async function runCinematic(onDone){
+  $cinLines.innerHTML='';$cinBar.style.width='0';$cinPct.textContent='0%';
+  $ovCin.classList.add('open');
+  // Glitch flash at start
+  $glitch.classList.add('fire');
+  setTimeout(()=>$glitch.classList.remove('fire'),400);
+
+  // Progress bar
+  let pct=0;
+  const pi=setInterval(()=>{
+    pct=Math.min(100,pct+Math.random()*3.5+1);
+    $cinBar.style.width=pct+'%';
+    $cinPct.textContent=Math.floor(pct)+'%';
+    if(pct>=100)clearInterval(pi);
+  },90);
+
+  const seq=[
+    ['> vireon://init','',200],
+    ['> loading core...','dim',800],
+    ['> checking integrity...','dim',1400],
+    ['> syncing nodes...','dim',2000],
+    ['','',2600],
+    ['> error: node sync failed','err',2600],
+    ['> retrying...','warn',3200],
+    ['> retrying... success','g',4000],
+    ['','',4700],
+    ['> welcome to vireon','g',4700],
+  ];
+  for(const[t,c,d]of seq)await cinLine(t,c,d);
+
+  // Second glitch flash at end
+  setTimeout(()=>{$glitch.classList.add('fire');setTimeout(()=>$glitch.classList.remove('fire'),400)},4900);
+
+  setTimeout(()=>{
+    $ovCin.classList.remove('open');
+    $cinLines.innerHTML='';
+    onDone();
+  },5800);
+}
+
+/* ══ RESUME ══ */
+const $ovR=document.getElementById('ov-resume');
+function showResume(){
+  const ago=minutesAgo(LS.get('v_last'));
+  document.getElementById('r-last').textContent=ago?`Last session: ${ago}`:'Last session: —';
+  $ovR.classList.add('open');
+}
+document.getElementById('btn-resume').addEventListener('click',()=>{$ovR.classList.remove('open');runCinematic(openTerm)});
+document.getElementById('btn-new').addEventListener('click',()=>{LS.clear();location.reload()});
+
+/* ══ ACCESS OVERLAY ══ */
+const $ovA=document.getElementById('ov-access');
+const $aKey=document.getElementById('acc-key');
+const $aMsg=document.getElementById('acc-msg');
+const openAccess=()=>{$ovA.classList.add('open');setTimeout(()=>$aKey.focus(),80)};
+const closeAccess=()=>{$ovA.classList.remove('open');$aMsg.textContent='';$aKey.value=''};
+document.getElementById('btn-req').addEventListener('click',openAccess);
+document.getElementById('btn-apply').addEventListener('click',openAccess);
+document.getElementById('acc-cancel').addEventListener('click',closeAccess);
+document.getElementById('acc-submit').addEventListener('click',tryAuth);
+$aKey.addEventListener('keydown',e=>{if(e.key==='Enter')tryAuth()});
+function tryAuth(){
+  const k=$aKey.value.trim();
+  if(k.toUpperCase()==='VIREONFLOW'||k==='VireonAccess'){
+    grantAuth('operator');
+    $aMsg.style.color='var(--gold)';
+    $aMsg.textContent='✓ authentication successful\nentering system...';
+    setTimeout(()=>{closeAccess();runCinematic(openTerm)},900);
+  } else {
+    $aMsg.style.color='#f87171';
+    $aMsg.textContent='authentication failed\nunauthorized attempt logged';
+    $aKey.style.borderColor='rgba(248,113,113,.38)';
+    setTimeout(()=>{$aKey.style.borderColor=''},1000);
+  }
+}
+
+/* ENTER button */
+document.getElementById('btn-enter').addEventListener('click',()=>{
+  if(!getAccess())grantAuth('guest');
+  runCinematic(openTerm);
+});
+
+/* ══ TERMINAL ENGINE ══ */
+const $ovT=document.getElementById('ov-term');
+const $tBody=document.getElementById('t-body');
+const $tIn=document.getElementById('t-in');
+let booted=false;
+
+function tP(txt,cls='',delay=0){
+  return new Promise(res=>setTimeout(()=>{
+    const d=document.createElement('div');d.className='tl '+(cls||'');d.textContent=txt;
+    $tBody.appendChild(d);$tBody.scrollTop=$tBody.scrollHeight;res();
+  },delay));
+}
+const tB=(d=0)=>tP('','',d);
+const tEcho=cmd=>tP('vireon> '+cmd,'dim');
+function screenFlicker(cb){$tBody.classList.add('flk');setTimeout(()=>{$tBody.classList.remove('flk');if(cb)cb()},920)}
+
+async function boot(){
+  if(booted)return;booted=true;
+  LS.set('v_last',Date.now().toString());
+  const role=getRole()||'guest';
+  const msgs=['>  initializing core...','>  loading execution layer...','>  syncing nodes...'];
+  await tB();
+  await tP(msgs[Math.floor(Math.random()*msgs.length)],'');
+  await tB(600);
+  await tP('vireon://system boot','g',700);
+  await tP('role: '+role,'g',820);
+  await tP('status: authenticated','g',960);
+  await tB(1100);
+  if(role==='operator'){
+    await tP('> welcome back, operator','g',1100);
+    await tP('> system integrity: stable','g',1300);
+  } else {
+    await tP('> guest access granted','dim',1100);
+    await tP('> limited commands available','dim',1280);
+  }
+  const prev=LS.get('v_last');
+  if(prev){const d=Math.floor((Date.now()-parseInt(prev))/60000);if(d>0)await tP(`> last session detected: ${d}min ago`,'dim',1480)}
+  await tB(400);
+  await tP("type 'help' for available commands.",'dim');
+  await tB(100);
+  updatePrompt();
+  setTimeout(()=>$tIn.focus(),200);
+}
+
+function openTerm(){
+  $ovT.classList.add('open');
+  document.body.classList.add('sys');
+  document.body.style.overflow='hidden';
+  boot();
+  const r=getRole();
+  document.getElementById('nav-lbl').textContent=r==='operator'?'OPERATOR:ACTIVE':'GUEST:ACTIVE';
+}
+function closeTerm(){$ovT.classList.remove('open');document.body.classList.remove('sys');document.body.style.overflow=''}
+document.getElementById('t-close').addEventListener('click',closeTerm);
+
+/* ══ COMMANDS ══ */
+const isOp=()=>getRole()==='operator';
+
+async function cmdHelp(){
+  await tB();
+  await tP('// COMMANDS','g');
+  const base=[
+    '  help        — this list',
+    '  scan        — scan network',
+    '  status      — system status',
+    '  ls          — list directory',
+    '  ls -a       — list all files (incl. hidden)',
+    '  cd <dir>    — change directory',
+    '  cd ..       — go up one level',
+    '  pwd         — show current path',
+    '  open <file> — read file contents',
+    '  clear       — clear terminal',
+    '  exit        — logout & reload',
+  ];
+  for(const l of base)await tP(l,'dim');
+  if(isOp()){
+    await tB();await tP('// OPERATOR','g');
+    const op=['  connect     — connect to network','  deploy      — deploy execution','  logs        — activity logs','  dashboard   — internal panel'];
+    for(const l of op)await tP(l,'dim');
+  }
+  const ex=[];
+  if(has('v_h1'))ex.push('  node        — [unlocked] node overview');
+  if(has('v_h2'))ex.push('  override    — [unlocked] override protocol');
+  if(has('v_h3'))ex.push('  core        — [RESTRICTED] deep system access');
+  if(ex.length){await tB();await tP('// UNLOCKED','g');for(const l of ex)await tP(l,'dim')}
+  await tB();
+}
+
+async function cmdScan(){
+  await tB();await tP('scanning network...','');
+  const opts=['signal detected','unusual pattern detected','weak activity found'];
+  await tP(opts[Math.floor(Math.random()*opts.length)],'g',800);
+  await tB(1200);
+  await tP('restricted layer signature found...','warn',1200);
+  await tP('ref: vireon://layer02','arg',1600);
+  await tB(1800);
+}
+
+async function cmdStatus(){
+  await tB();
+  await tP('system status: ACTIVE','g');
+  await tP('network: BASE','g');
+  await tP('nodes: 12','g');
+  await tP('cwd: '+cwd,'dim');
+  if(isOp()){await tP('role: operator','g');await tP('access: GRANTED','g')}
+  else{await tP('role: guest','warn');await tP('access: LIMITED','warn')}
+  await tB();
+}
+
+async function cmdLs(showHidden=false){
+  const entries=fsLs(showHidden);
+  await tB();
+  if(!entries.length){await tP('(empty)','dim');await tB();return}
+  for(const e of entries){
+    const p=cwd==='/'?`/${e}`:`${cwd}/${e}`;
+    const isDir=FS[p]!==undefined;
+    const isHidden=e.startsWith('.');
+    await tP(`  ${isDir?'d ':'  '}${e}`,isDir?'g':isHidden?'arg':'');
+  }
+  await tB();
+}
+
+async function cmdCd(target){
+  if(!target||target===''){await tB();await tP('cd: missing operand','err');await tB();return}
+  const err=fsCd(target);
+  if(err){await tB();await tP(err,'err')}
+  else{await tB();await tP('> '+cwd,'dim')}
+  await tB();
+  updatePrompt();
+}
+
+async function cmdPwd(){await tB();await tP(cwd,'g');await tB()}
+
+async function cmdOpen(name){
+  if(!name){await tB();await tP('open: missing filename','err');await tB();return}
+  if(name==='.access'&&!isOp()){await guestDenied();return}
+  const{content,isAccess}=fsOpen(name);
+  await tB();
+  for(const line of content.split('\n'))await tP(line,isAccess?'arg':'');
+  if(isAccess){await tB();await tP('// this key grants operator access','dim')}
+  await tB();
+}
+
+async function cmdConnect(){
+  if(!isOp()){await guestDenied();return}
+  await tB();await tP('connecting...','');await tP('connection established','g',900);await tB(1000);
+}
+
+async function cmdExit(){
+  await tP('terminating session...','warn');
+  await tP('clearing credentials...','warn',420);
+  setTimeout(()=>{LS.clear();closeTerm();booted=false;$tBody.innerHTML='';setTimeout(()=>location.reload(),300)},840);
+}
+
+async function guestDenied(){await tB();await tP('access denied','err');await tP('operator privileges required','dim');await tB()}
+
+/* Hidden Layer 01 */
+async function cmdUnlockH1(){
+  if(has('v_h1')){await tB();await tP('already unlocked.','dim');return}
+  set1('v_h1');
+  await tB();await tP('...','');
+  await tP('deep layer detected.','',500);
+  await tP('command "node" unlocked.','g',1000);await tB(1100);
+}
+async function cmdNode(){
+  await tB();await tP('// NODE STATUS','g');await tB();
+  await tP('  [●] node_01   active    14,827,441','');
+  await tP('  [●] node_02   active    14,827,441','');
+  await tB();
+}
+
+/* Hidden Layer 02 — operator only */
+async function cmdUnlockH2(){
+  if(!isOp()){await tB();await tP('access denied','err');await tP('operator privileges required','dim');await tB();return}
+  if(has('v_h2')){await tB();await tP('already unlocked.','dim');return}
+  set1('v_h2');
+  await tB();await tP('...','');await tP('...','',300);
+  await tP('secondary protocol located.','',700);
+  await tP('command "override" unlocked.','warn',1200);await tB(1300);
+}
+async function cmdOverride(){
+  await tB();await tP('override protocol initiated...','warn');
+  await tP('authenticating override key...','warn',600);
+  await tP('permission denied','err',1300);await tB(1400);
+}
+
+/* Hidden Layer 03 — operator + gated on L2 */
+async function cmdUnlockH3(){
+  if(!isOp()){await tB();await tP('access denied','err');await tP('operator privileges required','dim');await tB();return}
+  if(!has('v_h2')){
+    await tB();await tP('> accessing...','');await tP('> verifying...','',1200);
+    await tP('> permission denied','err',2600);await tB(2800);return;
+  }
+  if(has('v_h3')){await tB();await tP('> layer03 already breached.','void');await tB();return}
+  await tB();
+  await tP('> accessing...','');await tP('> verifying...','',1200);
+  await tP('> access granted','g',2700);
+  await tP('> warning: restricted system layer','warn',3600);
+  await tB(4200);await tP('> integrity check...','',4200);
+  await tP('> .','dim',5400);await tP('> ..','dim',6000);await tP('> ...','dim',6600);
+  await tP('> system integrity: unstable','core',7400);
+  await tP('> unknown origin detected','core',8400);
+  setTimeout(()=>screenFlicker(),9000);
+  await tB(9200);await tP('> new command unlocked: core','core',9200);await tB(9600);
+  set1('v_h3');$ovT.classList.add('l3');
+}
+
+/* Core — ARG entry point */
+async function cmdCore(){
+  if(!has('v_h3')){await cmdNotFound('core');return}
+  await tB();
+  await tP('> vireon core accessed','core');
+  await tP('> classification: undefined','core',900);
+  await tP('> origin: unknown','core',1700);
+  await tB(2600);await tP('> scanning core structure...','',2600);
+  await tP('  .','dim',3400);await tP('  ..','dim',4100);await tP('  ...','dim',4800);await tP('  ....','dim',5500);
+  await tB(6200);await tP('> anomaly detected','core',6200);
+  setTimeout(()=>screenFlicker(),7000);
+  await tB(8000);await tP('> message:','void',8000);await tP('>','void',9000);
+  await tP('> not all systems are meant to be accessed','flkr',9600);
+  await tB(11400);await tP('> ref: VX-01','arg',11400);await tB(12000);
+}
+
+/* ARG Step 1 */
+async function cmdVX01(){
+  set1('v_argref');
+  await tB();await tP('decoding reference...','arg');
+  await tP('.','dim',700);await tP('..','dim',1300);await tP('...','dim',1900);
+  await tP('link: vireon://signal','arg',2600);await tB(3000);
+}
+
+/* ARG Step 2 */
+async function cmdSignal(){
+  set1('v_signal');
+  await tB();await tP('> connecting to signal layer...','arg');
+  await tB(900);await tP('> encrypted message:','arg',900);
+  await tB(1700);await tP('> VklyrqHffhvv','core',1700);
+  await tB(2300);await tP('> transmission end.','dim',2300);await tB(3000);
+}
+
+/* Operator */
+async function cmdDeploy(){
+  await tB();await tP('deploying new execution...','');
+  await tP('validating contracts...','dim',480);await tP('broadcasting to network...','dim',1000);
+  await tP('deployment complete','g',1700);await tB(1800);
+}
+async function cmdLogs(){
+  await tB();await tP('// ACTIVITY LOG','g');await tB();
+  const ls=['[12:01] system active','[12:03] node connected','[12:05] execution confirmed','[12:08] pipeline running'];
+  for(let i=0;i<ls.length;i++)await tP('  '+ls[i],'dim',i*220);
+  await tB(ls.length*220+80);
+}
+async function cmdDashboard(){
+  if(!isOp()){await guestDenied();return}
+  closeTerm();openDash();
+}
+async function cmdNotFound(c){
+  await tB();await tP('command not recognized','err');await tP("type 'help' to continue",'dim');await tB();
+}
+
+/* ══ INPUT ROUTER ══ */
+$tIn.addEventListener('keydown',async e=>{
+  if(e.key!=='Enter')return;
+  const raw=$tIn.value.trim();$tIn.value='';
+  if(!raw)return;
+  tEcho(raw);
+  const cmd=raw.toLowerCase().trim();
+
+  /* Secret key in terminal — upgrades to operator */
+  if(raw==='VireonAccess'){
+    if(isOp()){await tB();await tP('already authenticated as operator.','dim');await tB();return}
+    grantAuth('operator');
+    document.getElementById('nav-lbl').textContent='OPERATOR:ACTIVE';
+    await tB();await tP('> elevated access granted','g');await tP('> role: operator','g',300);await tB(500);
+    updatePrompt();return;
+  }
+
+  /* ls -a variants */
+  if(cmd==='ls -a'||cmd==='ls-a'){await cmdLs(true);return}
+  /* cd with argument */
+  if(cmd.startsWith('cd ')&&cmd.length>3){await cmdCd(raw.slice(3).trim());return}
+  if(cmd==='cd'){await cmdCd('');return}
+  /* open with argument */
+  if(cmd.startsWith('open ')&&cmd.length>5){await cmdOpen(raw.slice(5).trim());return}
+  if(cmd==='open'){await cmdOpen('');return}
+
+  const GUEST={
+    help:()=>cmdHelp(),
+    scan:()=>cmdScan(),
+    status:()=>cmdStatus(),
+    ls:()=>cmdLs(false),
+    pwd:()=>cmdPwd(),
+    clear:()=>{$tBody.innerHTML='';booted=false;boot()},
+    exit:()=>cmdExit(),
+  };
+  const OP={
+    connect:()=>cmdConnect(),
+    deploy:()=>cmdDeploy(),
+    logs:()=>cmdLogs(),
+    dashboard:()=>cmdDashboard(),
+  };
+  const HIDDEN={
+    'vireon://hidden':()=>cmdUnlockH1(),
+    'vireon://layer02':()=>cmdUnlockH2(),
+    'vireon://layer03':()=>cmdUnlockH3(),
+    'vireon://signal':()=>cmdSignal(),
+    'vx-01':()=>cmdVX01(),
+    node:()=>has('v_h1')?cmdNode():cmdNotFound(cmd),
+    override:()=>has('v_h2')?cmdOverride():cmdNotFound(cmd),
+    core:()=>cmdCore(),
+  };
+
+  if(GUEST[cmd])            await GUEST[cmd]();
+  else if(HIDDEN[cmd])      await HIDDEN[cmd]();
+  else if(isOp()&&OP[cmd])  await OP[cmd]();
+  else if(!isOp()&&OP[cmd]) await guestDenied();
+  else                      await cmdNotFound(cmd);
+});
+
+/* ══ DASHBOARD ══ */
+const $ovD=document.getElementById('ov-dash');
+function openDash(){
+  document.getElementById('d-role').textContent=getRole()||'—';
+  const n=new Date();
+  document.getElementById('d-sess').textContent=
+    n.getHours().toString().padStart(2,'0')+':'+n.getMinutes().toString().padStart(2,'0');
+  $ovD.classList.add('open');
+  document.body.classList.add('sys');
+  document.body.style.overflow='hidden';
+  const $dl=document.getElementById('d-log');$dl.innerHTML='';
+  ['operator session authenticated','deployment pipeline active','12 nodes online','anomaly scan — clear','execution layer stable'].forEach((a,i)=>{
+    const d=document.createElement('div');d.className='tl dim';
+    d.style.animationDelay=(i*100)+'ms';d.textContent=`  [recent] ${a}`;$dl.appendChild(d);
+  });
+}
+function closeDash(){$ovD.classList.remove('open');document.body.classList.remove('sys');document.body.style.overflow=''}
+document.getElementById('d-close').addEventListener('click',closeDash);
+
+/* ══ BOOT CHECK ══ */
+window.addEventListener('DOMContentLoaded',()=>{
+  if(getAccess()==='granted') showResume();
+});
+</script>
+</body>
+</html>
